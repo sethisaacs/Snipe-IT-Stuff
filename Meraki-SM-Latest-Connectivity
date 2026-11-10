@@ -11,7 +11,7 @@ from datetime import datetime
 MERAKI_API_KEY = "APIKEY" Meraki API Key with view only for organization
 MERAKI_NETWORK_ID = "NET-ID" # Replace with network ID, not Organization ID
 
-SNIPEIT_BASE_URL = "https://localhost:PORT"  # Replace Port with network port or repalce all with Snipe URL
+SNIPEIT_BASE_URL = "URL"  # Replace with localhost:port or with Snipe URL
 SNIPEIT_API_KEY = "APIKEY" # Snipe API key with asset edit access
 SNIPEIT_CUSTOM_FIELD_KEY = "_snipeit_CUSTOM_FIELD_00"  # Snipe DB column name, repalce CUSTOM_FILED_00
 
