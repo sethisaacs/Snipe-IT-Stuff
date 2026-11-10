@@ -1,6 +1,6 @@
-# This script reports assets in the asset category 'CATEGORY' that have remaind in status 'STATUS' for 00 days or more. 
+# This script reports assets in the asset category 'CATEGORY' that have remained in status 'STATUS' for longer than a defined threshold. 
 # It will send a CSV report with the device asset ID, how long it has been 'STATUS', and the location it was sent from.
-# Set on a CRON job and run it on desired schedule
+# Set on a CRON job for for reporting.
 
 import requests
 import csv
@@ -12,22 +12,25 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 
-# --- Snipe Config ---
-SNIPEIT_URL = "URL" # Tenant URL
-API_TOKEN = "KEYKEY" # API Key
-STATUS_IDS = [00] # ID for STATUS
-CATEGORY_ID = 00 # ID for CATEGORY
-DAYS_THRESHOLD = 00 # Days in status
-OUTPUT_FILE = "Stale_Report.csv" # Report Name
+# Snipe Config (Loaded from environment file)
+SNIPEIT_URL = os.getenv("SNIPE_URL", "").rstrip("/")
+API_TOKEN = os.getenv("SNIPE_API_KEY", "")
 
-# --- Email Config ---
-SMTP_SERVER = "SERVER" # SMTP Server
-SMTP_PORT = 0 # SMTP Port
-SENDER_EMAIL = "sender@domain.com"
-SENDER_PASSWORD = "PWPW" # Sender Password
-RECIPIENT_EMAIL = "distro@domain.com" # Send to distro list or user
+# Script-Specific Variables
+STATUS_IDS = [0] # ID for STATUS
+CATEGORY_ID = 0 # ID for CATEGORY
+DAYS_THRESHOLD = 0 # Days in status
+OUTPUT_FILE = "Report.csv" # Report Name
 
-# --- Script ---
+# Email Config (Loaded from environment file)
+SMTP_SERVER = os.getenv("SMTP_SERVER", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", 0))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASS = os.getenv("SMTP_PASS", "")
+EMAIL_FROM = os.getenv("EMAIL_FROM", "")
+EMAIL_TO = os.getenv("EMAIL_TO", "")
+
+# Script
 headers = {
     "Authorization": f"Bearer {API_TOKEN}",
     "Accept": "application/json"
@@ -65,7 +68,8 @@ def get_stale_assets():
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
     for status_id in STATUS_IDS:
-        url = f"{SNIPEIT_URL}/api/v1/hardware?status_id={status_id}&category_id={CATEGORY_ID}"
+        # Added limit=1000 to bypass the default 50 item API limit
+        url = f"{SNIPEIT_URL}/api/v1/hardware?status_id={status_id}&category_id={CATEGORY_ID}&limit=1000"
         response = requests.get(url, headers=headers)
         
         if response.status_code != 200:
@@ -115,41 +119,46 @@ def generate_csv(assets):
     return True
 
 # Email Subject & Body Config
-def send_email(file_path):
+def send_email(file_path, body_text):
     print("Preparing to send email...")
+    todays_date = datetime.now().strftime("%d-%b-%y")
     msg = MIMEMultipart()
-    msg['From'] = SENDER_EMAIL
-    msg['To'] = RECIPIENT_EMAIL
-    msg['Subject'] = "SUBJECT" # Email Subject Line
+    msg['From'] = EMAIL_FROM
+    msg['To'] = EMAIL_TO
+    msg['Subject'] = f"Snipe-IT Report: Stale STATUS | CATEGORY - {todays_date}" 
     
-    body = "BODY BODY BODY" # Email Body
-    msg.attach(MIMEText(body, 'plain'))
+    # Attach the dynamic body text
+    msg.attach(MIMEText(body_text, 'plain'))
     
-    # Attach CSV
-    try:
-        with open(file_path, "rb") as attachment:
-            part = MIMEBase('application', 'octet-stream')
-            part.set_payload(attachment.read())
-        
-        encoders.encode_base64(part)
-        part.add_header(
-            'Content-Disposition',
-            f'attachment; filename= {os.path.basename(file_path)}'
-        )
-        msg.attach(part)
-    except Exception as e:
-        print(f"Failed to attach file: {e}")
-        return
+    # Only try to attach a CSV if a file_path was provided
+    if file_path:
+        try:
+            with open(file_path, "rb") as attachment:
+                part = MIMEBase('application', 'octet-stream')
+                part.set_payload(attachment.read())
+            
+            encoders.encode_base64(part)
+            part.add_header(
+                'Content-Disposition',
+                f'attachment; filename= {os.path.basename(file_path)}'
+            )
+            msg.attach(part)
+        except Exception as e:
+            print(f"Failed to attach file: {e}")
+            return
 
-    # Connect to Google's SMTP server and send
+    # Connect to SMTP server and send
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls() # Secure the connection
-        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        server.login(SMTP_USER, SMTP_PASS)
         text = msg.as_string()
-        server.sendmail(SENDER_EMAIL, RECIPIENT_EMAIL, text)
+        
+        # Split EMAIL_TO to handle both single and comma-separated multiple recipients
+        server.sendmail(EMAIL_FROM, EMAIL_TO.split(","), text)
+        
         server.quit()
-        print(f"Email sent successfully to {RECIPIENT_EMAIL}")
+        print(f"Email sent successfully to {EMAIL_TO}")
     except Exception as e:
         print(f"Failed to send email. Error: {e}")
 
@@ -157,6 +166,13 @@ if __name__ == "__main__":
     print(f"Gathering data for category ID {CATEGORY_ID} and analyzing asset history...")
     stale = get_stale_assets()
     
-    # Only send an email if the CSV was actually created (There are assets in the configured STATUS)
-    if generate_csv(stale):
-        send_email(OUTPUT_FILE)
+    if stale:
+        # Assets found: Generate CSV and send standard email with attachment
+        generate_csv(stale)
+        email_body = f"Please see the attached CSV report for CATEGORY Devices that have remained in STATUS longer than the {DAYS_THRESHOLD} day threshold."
+        send_email(OUTPUT_FILE, email_body)
+    else:
+        # No assets found: Skip CSV, send "all clear" email with no attachment
+        print("No assets exceeded the time threshold. Sending email without CSV.")
+        email_body = f"There are currently no CATEGORY Devices that have exceeded the {DAYS_THRESHOLD} day threshold."
+        send_email(None, email_body)
