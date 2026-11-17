@@ -15,7 +15,7 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 
-# Snipe Config (Loaded from scriptconfig.env)
+# Snipe Config (Loaded from snipe_script_config.env)
 SNIPEIT_URL = os.getenv("SNIPE_URL", "").rstrip("/")
 API_TOKEN = os.getenv("SNIPE_API_KEY", "")
 
@@ -24,7 +24,7 @@ CATEGORY_IDS = [1, 2, 3] # IDs for CATEGORY (1), CATEGORY (2), and CATEGORY (3)
 OUTPUT_FILE = "Assigned_Assets_Disabled_Users_Report.csv" # Report Name
 REQUEST_TIMEOUT = 30 # API timeout in seconds
 
-# Email Config (Loaded from scriptconfig.env)
+# Email Config (Loaded from snipe_script_config.env)
 SMTP_SERVER = os.getenv("SMTP_SERVER", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "")
 SMTP_USER = os.getenv("SMTP_USER", "")
