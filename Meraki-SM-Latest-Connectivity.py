@@ -8,7 +8,7 @@ import requests
 from datetime import datetime
 
 # ================= Configuration =================
-MERAKI_API_KEY = "APIKEY" Meraki API Key with view only for organization
+MERAKI_API_KEY = "APIKEY" # Meraki API Key with view only for organization
 MERAKI_NETWORK_ID = "NET-ID" # Replace with network ID, not Organization ID
 
 SNIPEIT_BASE_URL = "URL"  # Replace with localhost:port or with Snipe URL
